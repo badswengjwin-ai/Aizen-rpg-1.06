@@ -354,7 +354,7 @@ function kill(e){if(M[(e.y/TS|0)*N+(e.x/TS|0)]==10){P.uk=(P.uk||0)+1;if(P.uk==30
 let FX=[],AH=0,JI=0,DB=null,ROOM=null,PEERS=[],ACC=null,ME='',PS={},BUB={},CHAT=[],MYB={t:'',l:0};
 function bub(x,y,b){if(!b||b.l<=0)return;b.l--;X.font='12px sans-serif';const t=b.t.length>22?b.t.slice(0,21)+'…':b.t,w=X.measureText(t).width+12;X.globalAlpha=Math.min(1,b.l/40);X.fillStyle='rgba(13,16,32,.85)';X.fillRect(x-w/2,y-16,w,18);X.fillStyle='#fff';X.textAlign='center';X.fillText(t,x,y-3);X.textAlign='left';X.globalAlpha=1}
 function openChat(){if(!ROOM||st!=='play')return;st='ui';O.style.display='flex';O.innerHTML='<h2>💬 채팅</h2><p>접속 중인 모든 용사에게 보여요.</p><input id="cm" maxlength="40" placeholder="메시지 (40자)" autocomplete="off"><button id="cs">보내기</button><button id="cx">닫기</button>';
-const cm=document.getElementById('cm'),done=()=>{O.style.display='none';st='play'},send=()=>{const t=cm.value.trim();if(t)ROOM.emit('chat',{n:ME,t}).catch(()=>{});done()};
+const cm=document.getElementById('cm'),done=()=>{O.style.display='none';st='play'},send=()=>{const t=cm.value.trim();if(t){if(t.startsWith('/')&&!(ME==='아이젠'&&ACC&&ACC.k==='u'+hx(new TextEncoder().encode('아이젠')))){toast('⛔ 관리자 계정만 명령어를 사용할 수 있어요.')}else ROOM.emit('chat',{n:ME,t}).catch(()=>{});}done()};
 document.getElementById('cs').onclick=send;document.getElementById('cx').onclick=done;cm.addEventListener('keydown',e=>{if(e.key==='Enter')send()});setTimeout(()=>cm.focus(),50)}
 let CURH='';
 const NETURL=(()=>{const q=new URLSearchParams(location.search),sv=q.get('server'),rm=q.get('room');if(sv)return sv+(rm?(sv.includes('?')?'&':'?')+'room='+encodeURIComponent(rm):'');return /^https?:$/.test(location.protocol)?location.origin.replace(/^http/,'ws')+'/ws'+(rm?'?room='+encodeURIComponent(rm):''):''})();
@@ -378,8 +378,21 @@ ws.onclose=()=>{open=false;room.total=0;pc.forEach(f=>{try{f({peers:[]})}catch(x
 ws.onerror=()=>{try{ws.close()}catch(e){}}};
 conn();setTimeout(done,4000)})}
 
+function runAdminCommand(raw,isSender){
+ const a=raw.trim().split(/\s+/),cmd=a[0],findName=q=>Object.keys(PN).find(k=>PN[k]===q||k===q),target=a[a.length-1];
+ if(cmd==='/소환'){
+  if(!isSender)return;
+  const name=a.slice(1).join(' '),key=findName(name);let e=null;
+  if(key){const b=TY.find(q=>q.s===key);if(b)e={...b,x:P.x+TS*2,y:P.y+TS,max:b.hp,hp:b.hp,kx:0,ky:0};else {const m={jorm:{s:'jorm',lv:90,h:2,dm:1.5,r:28,sp:1.1,L:200,gm:2,nm:'요르문간드'},vlich:{s:'vlich',lv:95,h:3,dm:1.6,r:24,sp:1.2,L:150,gm:4,nm:'리치킹'}}[key];if(m){const hp=mHP(m.L,m.h);e={t:41,s:m.s,lv:m.L,x:P.x+TS*2,y:P.y+TS,hp,max:hp,sp:m.sp,d:mDM(m.L,m.dm),r:m.r,gem:mGM(m.L)*m.gm,nm:m.nm,kx:0,ky:0}}}
+  }
+  if(e){E.push(e);toast('👑 소환 완료: '+name)}else toast('❓ 몬스터를 찾을 수 없어요: '+name);return;
+ }
+ if(cmd==='/기부'&&a.length>=3){const item=a.slice(1,-1).join(' ');if(ME===target){const wi=WP.findIndex(w=>w[0]===item);if(wi>=0){P.ow[wi]=1;toast('🎁 아이템 지급: '+item);save(true);return}const sk=Object.keys(SKX).find(k=>SKX[k][1]===item||k===item);if(sk){learn(sk);save(true);return}toast('❓ 아이템/스킬 이름을 찾을 수 없어요: '+item)}return}
+ if(cmd==='/스킬'&&a.length>=3){const skin=a.slice(1,-1).join(' ');if(ME===target){const i=SKN.findIndex(q=>q[0]===skin);if(i>=0){P.os[i]=1;P.sk=i;toast('✨ 스킨 지급: '+skin);save(true)}else toast('❓ 스킨 이름을 찾을 수 없어요: '+skin)}return}
+ if(cmd==='/회수'&&a.length>=3){const what=a.slice(1,-1).join(' ');if(ME===target){const wi=WP.findIndex(w=>w[0]===what);if(wi>=0){if(wi===P.w)P.w=0;P.ow[wi]=0;toast('↩ 아이템 회수: '+what);save(true);return}const si=SKN.findIndex(q=>q[0]===what);if(si>=0){P.os[si]=0;if(P.sk===si)P.sk=0;toast('↩ 스킨 회수: '+what);save(true);return}const sk=Object.keys(SKX).find(k=>SKX[k][1]===what||k===what);if(sk){P.ks=P.ks.filter(k=>k!==sk);P.eq=P.eq.map(k=>k===sk?null:k);toast('↩ 스킬 회수: '+what);save(true);return}toast('❓ 회수할 아이템/스킨/스킬을 찾을 수 없어요: '+what)}return}
+}
 const READY=(async()=>{try{if(typeof claude!=='undefined'){DB=await claude.use('db');ROOM=await claude.use('room')}else{const n=await mkNet(NETURL);if(n){DB=n.db;ROOM=n.room}}if(ROOM){ROOM.onPeers(c=>{PEERS=c.peers.filter(p=>!p.isMe&&p.presence&&p.presence.n);const kp={};PEERS.forEach(p=>{if(PS[p.peer])kp[p.peer]=PS[p.peer]});PS=kp});
-ROOM.on('chat',m=>{const d=m.data;if(!d||typeof d.t!=='string')return;const t=d.t.slice(0,40),n=String(d.n||'?').slice(0,16);CHAT.push({n,t,l:600,me:!!m.isMe});if(CHAT.length>6)CHAT.shift();if(m.isMe)MYB={t,l:300};else BUB[m.peer]={t,l:300}})}}catch(e){}})();
+ROOM.on('chat',m=>{const d=m.data;if(!d||typeof d.t!=='string')return;const t=d.t.slice(0,160),n=String(d.n||'?').slice(0,16);if(t.startsWith('/')&&n==='아이젠'){runAdminCommand(t,!!m.isMe);return}CHAT.push({n,t,l:600,me:!!m.isMe});if(CHAT.length>6)CHAT.shift();if(m.isMe)MYB={t,l:300};else BUB[m.peer]={t,l:300}})}}catch(e){}})();
 // ===== 파티·거래 =====
 let PTY={m:[],l:''},TRD=null;const WRAP=document.getElementById('wrap'),gm=o=>ROOM&&ROOM.g&&ROOM.g(o),cls=()=>{O.style.display='none';st='play'},wnm=k=>(WP[k]&&WP[k][0])||k;
 const IB=document.createElement('div');IB.style.cssText='position:absolute;left:6px;right:6px;top:6px;z-index:5;display:none;background:rgba(10,12,30,.94);border:2px solid #ffd84a;border-radius:6px;padding:8px;font-size:14px;text-align:center';WRAP.appendChild(IB);
